@@ -7,12 +7,12 @@ from scipy.linalg import solve_triangular
 
 
 def vech(A: np.ndarray):
-    """Returns the lower triangular part of a matrix as a vector.
-    :param A: a square matrix
-    :return: a vector
+    """Vectorize the lower triangular part of a square matrix.
+    :param A: a square matrix (ndarray)
+    :return: a vector (ndarray)
     """
     m, n = A.shape
-    assert m == n, "Matrix must be square"
+    assert m == n, "Input must be a square matrix"
     v = []
     for j in range(m):
         for i in range(j, m):
