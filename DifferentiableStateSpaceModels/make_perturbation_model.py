@@ -7,7 +7,6 @@ import os
 import numpy as np
 from collections import OrderedDict
 from sympy import symbols, simplify, Identity
-from struct import Struct
 import DifferentiableStateSpaceModels
 
 
