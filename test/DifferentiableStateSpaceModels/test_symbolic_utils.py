@@ -29,7 +29,8 @@ def test_order_vector_by_symbols():
     subs_y = pd.DataFrame([make_substitutions(t, var) for var in y])
 
     # Concatenate subs_x and subs_y
-    subs = pd.concat([subs_x, subs_y])
+    subs = pd.concat([subs_x, subs_y]).reset_index(drop=True)
+    print(subs)
 
     # Convert p to symbols
     p_symbols = [str(var) for var in p]
