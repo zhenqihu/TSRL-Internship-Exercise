@@ -20,17 +20,18 @@ def default_model_cache_location():
 
 
 def make_perturbation_model(H, t, y, x, steady_states=None,
-                            steady_states_iv=None, Gamma=None, Omega=None, eta=None, Q=None,
+                            steady_states_iv=None, Γ=None, Ω=None, η=None, Q=None,
                             p=None, model_name=None,
                             model_cache_location=default_model_cache_location(),
                             overwrite_model_cache=False, print_level=1,
                             max_order=2, save_ip=True, save_oop=False,  # only does inplace by default
-                            skipzeros=True, fillzeros=False, simplify_psi=True,
+                            skipzeros=True, fillzeros=False, simplify_Ψ=True,
                             simplify=True, simplify_p=True):
-    assert max_order in [1, 2]  # only implemented up to second order
-    assert save_ip or save_oop  # save in place or out of place
 
-    # path of the module to be saved in the cache
+    assert max_order in [1, 2], "max_order must be 1 or 2"
+    assert save_ip or save_oop, "Either save_ip or save_oop must be True"
+
+    # path to save the model modules
     module_cache_path = os.path.join(model_cache_location, model_name + ".py")
 
     # only load cache if the module isn't already loaded in memory
@@ -50,21 +51,41 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     n_x = len(x)
     n = n_y + n_x
     n_p = len(p)
-    assert n_p > 0  # code written to have at least one parameter
-    n_epsilon = eta.shape[1]
+    assert n_p > 0, "Code written to have at least one parameter"
+    n_ϵ = η.shape[1]
     n_z = n if Q is None else Q.shape[0]
 
     # Get the markovian variables and create substitutions
-    y_subs = pd.DataFrame([make_substitutions(t, y_i) for y_i in y])
-    x_subs = pd.DataFrame([make_substitutions(t, x_i) for x_i in x])
-    y = y_subs['var'].values
-    x = x_subs['var'].values
-    y_p = y_subs['var_p'].values
-    x_p = x_subs['var_p'].values
-    y_ss = y_subs['var_ss'].values
-    x_ss = x_subs['var_ss'].values
-    subs = pd.concat([x_subs, y_subs]).reset_index(drop=True)
-    all_to_markov = pd.concat([subs['markov_t'], subs['markov_tp1'], subs['markov_inf']], axis=1).values
-    all_to_var = pd.concat([subs['tp1_to_var'], subs['inf_to_var']], axis=1).values
+    y_subs = [make_substitutions(t, y_i) for y_i in y]
+    x_subs = [make_substitutions(t, x_i) for x_i in x]
+    y = Matrix([y_i['var'] for y_i in y_subs])
+    x = Matrix([x_i['var'] for x_i in x_subs])
+    y_p = Matrix([y_i['var_p'] for y_i in y_subs])
+    x_p = Matrix([x_i['var_p'] for x_i in x_subs])
+    y_ss = Matrix([y_i['var_ss'] for y_i in y_subs])
+    x_ss = Matrix([x_i['var_ss'] for x_i in x_subs])
+    subs = x_subs + y_subs
+    all_to_markov = [sub['markov_t'] for sub in subs] + [sub['markov_tp1']
+                                                         for sub in subs] + [sub['markov_inf'] for sub in subs]
+    all_to_var = [sub['tp1_to_var']
+                  for sub in subs] + [sub['inf_to_var'] for sub in subs]
 
     # Helper to take the [z(∞) ~ expr] and become [z => expr] after substitutions
+    def equations_to_dict(equations):
+        return {str(eq.lhs.subs(all_to_markov).subs(all_to_var)): eq.rhs.subs(all_to_markov) for eq in equations}
+
+    if print_level > 0:
+        print("\033[96mBuilding model up to order {}\033[0m".format(max_order))
+    if print_level > 1:
+        print("\033[96msimplify = {}, simplify_p = {}, simplify Ψ = {}\033[0m".format(
+            simplify, simplify_p, simplify_Ψ))
+
+    # create functions in correct order
+    y_bar = None if steady_states is None else order_vector_by_symbols(
+        equations_to_dict(steady_states), [y_sub['symbol'] for y_sub in y_subs])
+    x_bar = None if steady_states is None else order_vector_by_symbols(
+        equations_to_dict(steady_states), [x_sub['symbol'] for x_sub in x_subs])
+    y_bar_iv = None if steady_states_iv is None else order_vector_by_symbols(
+        equations_to_dict(steady_states_iv), [y_sub['symbol'] for y_sub in y_subs])
+    x_bar_iv = None if steady_states_iv is None else order_vector_by_symbols(
+        equations_to_dict(steady_states_iv), [x_sub['symbol'] for x_sub in x_subs])

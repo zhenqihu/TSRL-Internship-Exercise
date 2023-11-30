@@ -32,7 +32,7 @@ def order_vector_by_symbols(x, symbol_list):
     :param symbol_list: list of symbols
     :return: a new list where the elements of x are ordered according to the order of symbol_list
     """
-    return [x[sym] for sym in symbol_list]
+    return Matrix([x[sym] for sym in symbol_list])
 
 
 def substitute_and_simplify(f, subs, do_simplify=False):
