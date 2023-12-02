@@ -5,6 +5,7 @@
 # @Date    : 28/11/2023 3:15 pm
 from sympy import symbols, simplify, diff, Function, Matrix, MatrixBase
 from collections.abc import Iterable
+import inspect
 
 
 def make_substitutions(t, f_var):
@@ -93,11 +94,10 @@ def differentiate_to_dict(f, p):
 
 
 # TODO: figure out how to make this function work with sympy ecosystems
-def name_symbolics_function(expr, name):
-    # Create a new function with the given name
-    newFunction = Function(name)
+def name_symbolics_function(func, name, inplace=False, symbol_dispatch=None):
+    # add the name for dispatch
+    globals()[name] = func
 
     # Replace the old function with the new one
-    named_expr = expr.replace(expr.func, newFunction)
 
     return named_expr
