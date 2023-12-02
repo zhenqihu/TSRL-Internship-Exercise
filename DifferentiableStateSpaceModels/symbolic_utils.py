@@ -3,7 +3,7 @@
 # @File    : symbolic_utils.py
 # @Author  : Zhenqi Hu
 # @Date    : 28/11/2023 3:15 pm
-from sympy import symbols, simplify, diff, Function, Matrix
+from sympy import symbols, simplify, diff, Function, Matrix, MatrixBase
 from collections.abc import Iterable
 
 
@@ -30,7 +30,7 @@ def order_vector_by_symbols(x, symbol_list):
     Orders a vector according to a list of symbols
     :param x: dictionary of symbols
     :param symbol_list: list of symbols
-    :return: a new list where the elements of x are ordered according to the order of symbol_list
+    :return: a new Matrix ordered according to the list of symbols
     """
     return Matrix([x[sym] for sym in symbol_list])
 
@@ -59,22 +59,25 @@ def nested_differentiate(f, x, do_simplify=False):
     if f is None or x is None:
         return None
 
-    if isinstance(f, list):
-        if isinstance(f[0], list):  # Matrix case
-            if isinstance(x, list):  # Vector case
-                return [[diff(elem, var) for var in x] for elem in f]
-            else:  # Num case
-                return [[diff(elem, x) for elem in sublist] for sublist in f]
-        else:  # Vector case
-            if isinstance(x, list):  # Vector case
-                return [[diff(elem, var) for var in x] for elem in f]
-            else:  # Num case
-                return [diff(elem, x) for elem in f]
-    else:  # Num case
-        if isinstance(x, list):  # Vector case
-            return [diff(f, var) for var in x]
-        else:  # Num case
-            return diff(f, x)
+    if isinstance(f, MatrixBase):
+        # f is a sympy matrix
+        if isinstance(x, MatrixBase):
+            return Matrix([simplify(diff(f, x_i).doit()) if do_simplify else diff(f, x_i).doit() for x_i in x])
+        else:
+            return simplify(diff(f, x).doit()) if do_simplify else diff(f, x).doit()
+    elif isinstance(f, list):
+        if isinstance(f[0], MatrixBase):
+            # f is a list of sympy matrices (e.g. Psi)
+            if isinstance(x, MatrixBase):
+                return [nested_differentiate(f, x_i, do_simplify) for x_i in x]
+            else:
+                return [nested_differentiate(f_i, x, do_simplify) for f_i in f]
+        else:
+            # f is a list of sympy expressions (e.g. H, system of equations)
+            if isinstance(x, MatrixBase):
+                return Matrix([simplify(diff(f_i, x).doit().T) if do_simplify else diff(f_i, x).doit().T for f_i in f])
+            else:
+                return Matrix([simplify(diff(f, x).doit()) if do_simplify else diff(f, x).doit() for f in f])
 
 
 def differentiate_to_dict(f, p):

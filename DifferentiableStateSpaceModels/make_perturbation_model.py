@@ -9,6 +9,8 @@ import DifferentiableStateSpaceModels
 from DifferentiableStateSpaceModels import *
 import numpy as np
 import pandas as pd
+from sympy import Matrix, latex, hessian, simplify
+from copy import deepcopy
 
 
 def default_model_cache_location():
@@ -89,3 +91,39 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
         equations_to_dict(steady_states_iv), [y_sub['symbol'] for y_sub in y_subs])
     x_bar_iv = None if steady_states_iv is None else order_vector_by_symbols(
         equations_to_dict(steady_states_iv), [x_sub['symbol'] for x_sub in x_subs])
+
+    # Get any latex generated stuff we wish for pretty display of the model
+    H_latex = latex(H)
+    steady_states_latex = latex(steady_states)
+    steady_states_iv_latex = latex(
+        steady_states_iv) if steady_states_iv is not None else None
+
+    # Substitute variables in H with their corresponding expressions in all_to_markov
+    H = [expr.subs(all_to_markov) for expr in H]
+    # Create a deep copy of H
+    H_bar = deepcopy(H)
+    # Substitute variables in H_bar with their corresponding expressions in all_to_var, then simplify
+    H_bar = substitute_and_simplify(H_bar, all_to_var)
+
+    if print_level > 2:
+        print("\033[96mDifferentiating H\033[0m")
+    H_bar_w = nested_differentiate(H_bar, y.col_join(x))
+    H_yp = nested_differentiate(H, y_p)
+    H_y = nested_differentiate(H, y)
+    H_xp = nested_differentiate(H, x_p)
+    H_x = nested_differentiate(H, x)
+
+    # Calculate the Hessian for each function in H
+    if print_level > 1:
+        print("\033[96mCalculating hessian\033[0m")
+    Psi = [hessian(f, y_p.col_join(y).col_join(x_p).col_join(x)) for f in H]
+    if simplify_Ψ:
+        Psi = [simplify(psi) for psi in Psi]
+
+    # Differentiate the Hessian with respect to various variables
+    if print_level > 2 and max_order >= 2:
+        print("\033[96mDifferentiating hessian\033[0m")
+    Psi_yp = None if max_order < 2 else nested_differentiate(Psi, y_p)
+    Psi_y = None if max_order < 2 else nested_differentiate(Psi, y)
+    Psi_xp = None if max_order < 2 else nested_differentiate(Psi, x_p)
+    Psi_x = None if max_order < 2 else nested_differentiate(Psi, x)
