@@ -177,3 +177,5 @@ cython_debug/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+.function_cache/

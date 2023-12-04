@@ -91,28 +91,3 @@ def differentiate_to_dict(f, p):
     if f is None or p is None:
         return None
     return {str(p_val): nested_differentiate(f, p_val) for p_val in p}
-
-
-# TODO: figure out how to make this function work with sympy ecosystems
-def name_symbolics_function(expr, name, inplace=False, symbol_dispatch=None, striplines=True):
-    # Get the source code of the function
-    source_code = inspect.getsource(expr)
-    # Replace the function name with the new name
-    source_code = source_code.replace("_lambdifygenerated", name)
-
-    # If replacing first parameter to dispatching on a symbol
-    if symbol_dispatch is not None:
-        # Get the function's arguments
-        args = inspect.getargspec(expr).args
-        # Determine the dispatch position
-        dispatch_position = 1 if inplace else 0
-        # Replace the argument at the dispatch position with the symbol dispatch
-        source_code = source_code.replace(args[dispatch_position], str(symbol_dispatch))
-
-    # If striplines is True, remove all newline characters
-    if striplines:
-        source_code = source_code.replace('\n', '')
-    # Define the new function in the current scope
-    exec(source_code, globals())
-    # Return the new function
-    return globals()[name]

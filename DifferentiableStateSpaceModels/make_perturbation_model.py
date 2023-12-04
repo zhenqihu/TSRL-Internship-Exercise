@@ -143,17 +143,17 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     # Calculate the Hessian for each function in H
     if print_level > 1:
         print("\033[96mCalculating hessian\033[0m")
-    Psi = [hessian(f, y_p.col_join(y).col_join(x_p).col_join(x)) for f in H]
+    Ψ = [hessian(f, y_p.col_join(y).col_join(x_p).col_join(x)) for f in H]
     if simplify_Ψ:
-        Psi = [simplify(psi) for psi in Psi]
+        Ψ = [simplify(psi) for psi in Ψ]
 
     # Differentiate the Hessian with respect to state/control variables
     if print_level > 2 and max_order >= 2:
         print("\033[96mDifferentiating hessian\033[0m")
-    Psi_yp = None if max_order < 2 else nested_differentiate(Psi, y_p)
-    Psi_y = None if max_order < 2 else nested_differentiate(Psi, y)
-    Psi_xp = None if max_order < 2 else nested_differentiate(Psi, x_p)
-    Psi_x = None if max_order < 2 else nested_differentiate(Psi, x)
+    Ψ_yp = None if max_order < 2 else nested_differentiate(Ψ, y_p)
+    Ψ_y = None if max_order < 2 else nested_differentiate(Ψ, y)
+    Ψ_xp = None if max_order < 2 else nested_differentiate(Ψ, x_p)
+    Ψ_x = None if max_order < 2 else nested_differentiate(Ψ, x)
 
     # Differentiate steady states with respect to parameters
     if print_level > 2:
@@ -176,7 +176,7 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     # Differentiate Hessian with respect to parameters
     if print_level > 2 and max_order >= 2:
         print("\033[96mDifferentiating hessian with respect to parameters\n\033[0m")
-    Psi_p = None if max_order < 2 else differentiate_to_dict(Psi, p)
+    Ψ_p = None if max_order < 2 else differentiate_to_dict(Ψ, p)
 
     # Substitute and simplify
     if print_level > 0:
@@ -186,7 +186,7 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     H_xp = substitute_and_simplify(H_xp, all_to_var, do_simplify)
     H_x = substitute_and_simplify(H_x, all_to_var, do_simplify)
     H_y = substitute_and_simplify(H_y, all_to_var, do_simplify)
-    Psi = substitute_and_simplify(Psi, all_to_var, do_simplify)
+    Ψ = substitute_and_simplify(Ψ, all_to_var, do_simplify)
 
     # Substitute and simplify parameters derivatives
     if print_level > 2:
@@ -204,28 +204,77 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     # Substitute and simplify second order of Hessian
     if print_level > 1 and max_order >= 2:
         print("\033[96mSubstituting and simplifying 2nd order\033[0m")
-    Psi_yp = substitute_and_simplify(Psi_yp, all_to_var, do_simplify)
-    Psi_y = substitute_and_simplify(Psi_y, all_to_var, do_simplify)
-    Psi_xp = substitute_and_simplify(Psi_xp, all_to_var, do_simplify)
-    Psi_x = substitute_and_simplify(Psi_x, all_to_var, do_simplify)
+    Ψ_yp = substitute_and_simplify(Ψ_yp, all_to_var, do_simplify)
+    Ψ_y = substitute_and_simplify(Ψ_y, all_to_var, do_simplify)
+    Ψ_xp = substitute_and_simplify(Ψ_xp, all_to_var, do_simplify)
+    Ψ_x = substitute_and_simplify(Ψ_x, all_to_var, do_simplify)
 
     # Substitute and simplify second order derivatives wrt parameters of Hessian
     if print_level > 2 and max_order >= 2:
         print("\033[96mSubstituting and simplifying 2nd order parameter derivatives\n\033[0m")
-    Psi_p = substitute_and_simplify(Psi_p, all_to_var, simplify_p)
+    Ψ_p = substitute_and_simplify(Ψ_p, all_to_var, simplify_p)
 
     # ------------------------------ Beginning building the model function --------------------------------------------#
     # Generate all functions, and rename using utility
-    def build_named_functions(expr, name, args):
+    def build_named_function(expr, name, *args):
         if expr is None:
             return None
         if isinstance(expr, dict):
-            return {key: build_named_functions(value, name + key, *args)
+            return {key: build_named_function(value, name + "_" + key, *args)
                     for key, value in expr.items()}
         else:
             # create the function from the expression
-            f = lambdify(args, expr, modules=["numpy", "scipy", "tensorflow"], dummify=False)
+            f = lambdify(args, expr, modules="numpy")
             # rename the function
             source_code = inspect.getsource(f)
             source_code = source_code.replace("_lambdifygenerated", name)
         return source_code
+
+    # Build the model functions
+    if print_level > 0:
+        print("\033[96m Building model functions \033[0m")
+    Γ_expr = build_named_function(Γ, "Γ", p)
+    Ω_expr = build_named_function(Ω, "Ω", p)
+    H_expr = build_named_function(H, "H", y_p, y, y_ss, x_p, x, x_ss, p)
+    H_yp_expr = build_named_function(H_yp, "H_yp", y, x, p)
+    H_y_expr = build_named_function(H_y, "H_y", y, x, p)
+    H_xp_expr = build_named_function(H_xp, "H_xp", y, x, p)
+    H_x_expr = build_named_function(H_x, "H_x", y, x, p)
+    Ψ_expr = build_named_function(Ψ, "Ψ", y, x, p)
+    Ψ_yp_expr = None if max_order < 2 else build_named_function(Ψ_yp, "Ψ_yp", y, x, p)
+    Ψ_y_expr = None if max_order < 2 else build_named_function(Ψ_y, "Ψ_y", y, x, p)
+    Ψ_xp_expr = None if max_order < 2 else build_named_function(Ψ_xp, "Ψ_xp", y, x, p)
+    Ψ_x_expr = None if max_order < 2 else build_named_function(Ψ_x, "Ψ_x", y, x, p)
+    H_bar_expr = build_named_function(H_bar, "H̄", [y, x], p)
+    H_bar_w_expr = build_named_function(H_bar_w, "H̄_w", [y, x], p)
+    y_bar_iv_expr = build_named_function(y_bar_iv, "ȳ_iv", p)
+    x_bar_iv_expr = build_named_function(x_bar_iv, "x̄_iv", p)
+    y_bar_expr = build_named_function(y_bar, "ȳ", p)
+    x_bar_expr = build_named_function(x_bar, "x̄", p)
+
+    # Build the model functions for derivatives
+    if print_level > 2:
+        print("\033[96m Building model functions for derivatives \033[0m")
+    Γ_p_expr = build_named_function(Γ_p, "Γ_p", p)
+    Ω_p_expr = build_named_function(Ω_p, "Ω_p", p)
+    H_yp_p_expr = build_named_function(H_yp_p, "H_yp_p", y, x, p)
+    H_y_p_expr = build_named_function(H_y_p, "H_y_p", y, x, p)
+    H_xp_p_expr = build_named_function(H_xp_p, "H_xp_p", y, x, p)
+    H_x_p_expr = build_named_function(H_x_p, "H_x_p", y, x, p)
+    H_p_expr = build_named_function(H_p, "H_p", y, x, p)
+    y_bar_p_expr = build_named_function(y_bar_p, "ȳ_p", p)
+    x_bar_p_expr = build_named_function(x_bar_p, "x̄_p", p)
+    Ψ_p_expr = None if max_order < 2 else build_named_function(Ψ_p, "Ψ_p", y, x, p)
+
+    # Done with building the model functions
+    if print_level > 2:
+        print("\033[96m Done building model \033[0m")
+
+    # ------------------------------ Beginning Save the model & functions --------------------------------------------#
+    # Separate filenames for different orders and function types.  For example
+    os.makedirs(model_cache_location, exist_ok=True)
+    os.makedirs(os.path.join(model_cache_location, model_name), exist_ok=True)
+    # module_cache_path has the core module stuff and includes the others
+    zero_order_path = os.path.join(model_cache_location, model_name, "zero_order.py")
+    first_order_path = os.path.join(model_cache_location, model_name, "first_order.py")
+    second_order_path = os.path.join(model_cache_location, model_name, "second_order.py")
