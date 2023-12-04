@@ -216,17 +216,16 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
 
     # ------------------------------ Beginning building the model function --------------------------------------------#
     # Generate all functions, and rename using utility
-    def build_named_functions(expr, name, *args, symbol_dispatch=None):
+    def build_named_functions(expr, name, args):
         if expr is None:
             return None
         if isinstance(expr, dict):
-            return {key: build_named_functions(value, name, *args, symbol_dispatch=key)
+            return {key: build_named_functions(value, name + key, *args)
                     for key, value in expr.items()}
-        elif isinstance(expr, Iterable):
-            return [build_named_functions(value, name, *args, symbol_dispatch=symbol_dispatch)
-                    for value in expr]
         else:
             # create the function from the expression
-            f = lambdify(args, expr, modules=["numpy", "scipy", "tensorflow"])
-            func = name_symbolics_function(f, name, symbol_dispatch=symbol_dispatch)  # rename the function
-        return func
+            f = lambdify(args, expr, modules=["numpy", "scipy", "tensorflow"], dummify=False)
+            # rename the function
+            source_code = inspect.getsource(f)
+            source_code = source_code.replace("_lambdifygenerated", name)
+        return source_code
