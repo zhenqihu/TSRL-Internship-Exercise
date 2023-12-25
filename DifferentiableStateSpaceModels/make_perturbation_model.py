@@ -24,8 +24,7 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
                             p=None, model_name=None,
                             model_cache_location=default_model_cache_location(),
                             overwrite_model_cache=False, print_level=1,
-                            max_order=2, save_ip=True, save_oop=False,  # only does inplace by default
-                            skipzeros=True, fillzeros=False, simplify_Ψ=True,
+                            max_order=2, skipzeros=True, fillzeros=False, simplify_Ψ=True,
                             do_simplify=True, simplify_p=True):
     """
     Creates a perturbation model for a system of equations of the form
@@ -46,8 +45,6 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     :param overwrite_model_cache: whether to overwrite the model cache (boolean)
     :param print_level: level of printing (int)
     :param max_order: maximum order of the model (int)
-    :param save_ip: whether to save the model in place (boolean)
-    :param save_oop: whether to save the model out of place (boolean)
     :param skipzeros:
     :param fillzeros:
     :param simplify_Ψ:
@@ -58,10 +55,9 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
 
     # check inputs
     assert max_order in [1, 2], "max_order must be 1 or 2"
-    assert save_ip or save_oop, "Either save_ip or save_oop must be True"
 
     # path to save the model modules
-    module_cache_path = os.path.join(model_cache_location, model_name + ".py")
+    module_cache_path = os.path.join(model_cache_location, model_name, "__init__.py")
 
     # only load cache if the module isn't already loaded in memory
     if (str(model_name) in globals()) and (not overwrite_model_cache):
@@ -215,21 +211,6 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     Ψ_p = substitute_and_simplify(Ψ_p, all_to_var, simplify_p)
 
     # ------------------------------ Beginning building the model function --------------------------------------------#
-    # Generate all functions, and rename using utility
-    def build_named_function(expr, name, *args):
-        if expr is None:
-            return None
-        if isinstance(expr, dict):
-            return {key: build_named_function(value, name + "_" + key, *args)
-                    for key, value in expr.items()}
-        else:
-            # create the function from the expression
-            f = lambdify(args, expr, modules="numpy")
-            # rename the function
-            source_code = inspect.getsource(f)
-            source_code = source_code.replace("_lambdifygenerated", name)
-        return source_code
-
     # Build the model functions
     if print_level > 0:
         print("\033[96m Building model functions \033[0m")

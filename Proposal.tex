@@ -4,9 +4,12 @@
 \geometry{a4paper}
 
 \usepackage{natbib}
-\bibliographystyle{plainnat}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
 
-\title{Project Proposal: Replication of \citet{childersDifferentiableStateSpaceModels2022}}
+\title{Project Proposal: Machine Learning for Economics}
 \author{Zhenqi (Luke) Hu}
 \date{\today}
 
@@ -14,23 +17,105 @@
 \maketitle
 
 \section{Introduction}
-This project is  \citet{childersDifferentiableStateSpaceModels2022}.
+This project is aimed at replicating the results of \citet{childersDifferentiableStateSpaceModels2022}. This paper proposes a methodology to take dynamic stochastic general equilibrium (DSGE) models to the data based on the combination of differentiable state-space models and the Hamiltonian Monte Carlo (HMC) algorithm. 
 
-\section{Literature Review}
-Discuss the existing literature related to your project.
+\subsection*{Differentiable State-Space DSGE Models}
+The class of DSGE models is a standard tool for macroeconomic analysis and includes various models based on different assumptions (e.g. real business cycle models (RBC), New Keynesian models (NK), etc.)\footnote{\citet{fernandez-villaverdeEstimatingDSGEModels2021} is a comprehensive review paper for the general framework and estimation of DSGE model.}. Following \citet{schmitt-groheSolvingDynamicGeneral2004}, the general form of a DSGE model can be written as a system of equations:
+$$
+E_t H(y_{t+1}, y_t, x_{t+1}, x_t) = 0
+$$
+where $x$ denotes the vector of state variables that determine the economy's evolution, and $y$ denotes the vector of endogenous variables that are determined by the state variables (control variables). $H$ is the system of equations that characterize the model. The expectation operator $E_t$ is the conditional expectation given the information set at time $t$.
 
-\section{Methodology Design}
-Describe the methodology you plan to use for the replication.
+Since the model is Markov, we can omit the time subscripts and write the model as:
+$$
+\begin{aligned}
+    E H(y^{\prime}, y, x^{\prime}, x) = 0
+\end{aligned}
+$$
+where prime denotes the next period value. The solutions of this class of models can be written as:
+$$
+\begin{aligned}
+y &= g(x;\theta)  &\text{(Policy Equation)}\\
+x^{\prime} &= h(x;\theta) + \eta\epsilon^{\prime} &\text{(Transition Equation)}
+\end{aligned}
+$$
+where $\theta$ is the vector of parameters, $\epsilon$ is a vector of i.i.d. shocks, $\eta$ is a matrix of shock loadings. The policy equation $g(\cdot)$ describes the optimal behavior of the agents, and the transition equation $h(\cdot)$ characterizes the law of motion of the state variables.
 
-\section{Preliminary Results}
-Discuss any preliminary results you have obtained.
+The transition equation is formed as the first leg of the state-space representation\footnote{\citet{hamiltonTimeSeriesAnalysis1994} provides a detailed introduction to state-space representation and Kalman filter in Chapter 13.}, while the second leg is the measurement equation:
+$$
+\begin{aligned}
+    z &= q(x,v;\theta)\\
+    &=Q \cdot [y \quad x]^T + v &\text{(Measurement Equation)}
+\end{aligned}
+$$
+where $z$ may contain one or more states, as well as one or more control variables. $v$ is a vector of i.i.d. measurement errors or shocks to observables other than the states.
 
-\section{Code Testing Plan}
-Outline your plan for testing the code you will write for the project.
+Hence, the objective of estimating DSGE models is to estimate the parameters $\theta$, as well as the unobserved states $x$, given the observed data $z$, that is, the joint posterior distribution $p(\theta, x|z)$.
 
-\section{Conclusion}
-Conclude your proposal.
+\subsection*{Hamiltonian Monte Carlo Estimation}
+Monte Carlo Markov Chain (MCMC) methods are widely used in Bayesian estimation of state-space models. \citet{gelman2013bayesian} is a comprehensive reference for Bayesian estimation and MCMC methods, and for researchers who are from an economics or finance background (like me), \citet{johannesCHAPTER13MCMC2010} is a good starting point.
+
+Hamiltonian Monte Carlo (HMC) sampler is a variant of MCMC methods, which borrows the idea from Hamiltonian dynamics in physics and improves the efficiency of the sampling process compared to the traditional Metropolis-Hastings (MH) algorithm. For conciseness, I will not go into the details of HMC, and refer the readers to \citet{gelman2013bayesian} and \citet{neal2011mcmc} for more information \footnote{\href{https://mc-stan.org/docs/reference-manual/hamiltonian-monte-carlo.html}{Stan Reference Manual} also provides a short introduction of HMC that is easy to understand.}. However, I will emphasize some important features of HMC:
+\begin{enumerate}
+    \item Based on Baye's rule, the HMC sampler requires the prior distribution $p(\theta)$ and the likelihood function $p(z|\theta)$ as inputs, and then generates samples from the posterior distribution $p(\theta|z)$. The prior distribution is usually easy to specify, while the likelihood function is the key to the success of HMC and needs to be carefully constructed from the model. (See the parts one and two of the replication design.)
+    \item One feature of HMC is that it requires the gradient of the log-posterior density, so automatic differentiation (AD) plays an important role in the implementation, which is also an embedded feature of the TensorFlow ecosystem.
+    \item Besides the prior and likelihood, there are two hyperparameters in HMC: the step size $\epsilon$ and the number of steps $L$. The optimal values of these two hyperparameters need to be carefully tuned. (See the part three of the replication design.)
+\end{enumerate}
+
+Since we need the likelihood function to implement the HMC sampler, the authors propose two alternative approaches to construct the likelihood in a typical state-space model: (1) The Marginal Likelihood (with Kalman Filter to infer the unobserved states $x$); (2) The Joint Likelihood (with the unobserved states $x$ as additional parameters). The former is used in the benchmark random walk Metropolis-Hastings (RWMH) algorithm, while the latter is used in the HMC sampler. See Section 2.2-2.3 of the paper for more details.
+
+\section{Replication Design}
+The authors provide a Github repo, \href{https://github.com/HighDimensionalEconLab/HMCExamples.jl}{HMCExamples.jl}, which is written in Julia. My replicating project will be based on their structure and methodology, but rewritten using Python. I briefly outline the steps below.
+\subsection*{Part One: Build the Model Symbolically}
+
+The author developed a Julia package \href{https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl}{DifferentiableStateSpaceModels.jl} to handle first- and second-order solutions to state-space models, gradients, and sensitivity analysis. They build the model symbolically using \href{https://github.com/JuliaSymbolics/Symbolics.jl}{Symbolics.jl}, and then generate the symbolic derivatives for the model to use in the perturbation solution algorithms. All the symbolic results are then converted to Julia functions and saved in modules.
+
+In the Python ecosystem, \href{https://www.sympy.org/}{Sympy} package provides similar tools for symbolic computation. The replication procedure is straightforward, after constructing the symbolic model using the 'Symbol', 'Functions', and 'Matrix' classes in Sympy, we can use 'diff' and 'hessian' functions to compute the symbolic derivatives. In the end, we can use 'lambdify' function to convert SymPy expressions to equivalent numeric functions, which will be used in the later steps.
+
+It is worth noting that Julia has some features that are not available in Python, such as multiple dispatch and meta-programming. Hence, the replication may not be exactly the same as the original package.
+
+\subsection*{Part Two: Simulation and Likelihood Evaluation}
+In the next step, the generated state-space model, given a set of parameters, will be used to:
+\begin{enumerate}
+    \item Simulate the model and generate the simulated data.
+    \item Evaluate the likelihood of the model given the data.
+\end{enumerate}
+
+The author utilized the \href{https://github.com/SciML/DifferenceEquations.jl}{DifferentialEquations.jl} package to achieve their goals. In the Python ecosystem, the \href{https://scipy.org/}{Scipy} plays a similar role. First, we need the sovler from \href{https://docs.scipy.org/doc/scipy/reference/integrate.html#}{scipy.integrate} and \href{https://docs.scipy.org/doc/scipy/reference/linalg.html}{scipy.linalg} to solve the differential equations (i.e. the \href{https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.solve_sylvester.html}{Sylvester equation}). Then, we can use the \href{https://docs.scipy.org/doc/scipy/reference/stats.html}{scipy.stats}, as well as the \href{https://www.tensorflow.org/probability}{TensorFlow Probability} to evaluate the likelihood, for both a marginalized approach with a Kalman filter and a joint approach, and for both Gaussian and No-Gaussian shocks. The calculated log-likelihood will be a key input to construct the HMC sampler in the next step.
+
+\subsection*{Part Three: Bayesian Estimation using HMC Sampler}
+Finally, we need to implement the Bayesian estimation using the HMC sampler. The author used the \href{https://turing.ml/}{Turing.jl} probabilistic programming language, and \href{https://github.com/FluxML/Zygote.jl}{Zygote.jl} for automatic differentiation. In the Python ecosystem, there are many alternatives, while we are required to use \href{https://www.tensorflow.org/probability}{TensorFlow Probability} in this project.
+
+The \href{https://www.tensorflow.org/probability/api_docs/python/tfp/mcmc}{tfp.mcmc} package provides a set of Markov chain Monte Carlo (MCMC) algorithms for sampling from probability distributions, including a basic HMC sampler \href{https://www.tensorflow.org/probability/api_docs/python/tfp/mcmc/HamiltonianMonteCarlo}{tfp.mcmc.HamiltonianMonteCarlo}, as well as a more advanced type No-U-Turn Sampler (NUTS), \href{https://www.tensorflow.org/probability/api_docs/python/tfp/mcmc/NoUTurnSampler}{tfp.mcmc.NoUTurnSampler}. The later variant, proposed by \citet{hoffman2014no}, endogenously pick $\epsilon$ and $L$ with sample adaptations, and is the main choice for this paper. An alternative is to wrap the basic HMC sampler in a \href{https://www.tensorflow.org/probability/api_docs/python/tfp/mcmc/SimpleStepSizeAdaptation}{tfp.mcmc.SimpleStepSizeAdaptation} "meta-kernel", which adaptively tunes the step size of the inner kernel.
+%\footnote{\href{www.tensorflow.org/probability/examples/A_Tour_of_TensorFlow_Probability#mcmc}}
+
+\subsection*{Benchmark}
+For comparing the performance of our HMC implementation in TensorFlow Probability, we need several benchmarks.
+
+The first straightforward one is to compare the efficiency and robustness of our implementation with the original Julia implementation. The authors present their results for three DSGE models: a simple real business cycle (RBC) model, a real small open economy model based on \citet{schmitt2003closing} (SGU), and a medium-scale New Keynesian DSGE model, namely \citet{fernandez-villaverdeEstimatingDSGEModels2021} (FVGQ).
+
+Besides, we can also compare the performance with \href{https://www.dynare.org/}{Dynare}, the most popular software for estimating DSGE models and can act as a strong benchmark. Both the Julia and Dynare implementations are provided in the authors' Github repo.
+
+\subsection*{Testing}
+
+To ensure the correctness of our implementation, we will follow a systematic testing plan:
+
+\begin{enumerate}
+    \item \textbf{Unit Testing:} We will test individual components of the code to ensure they function as expected in isolation.
+    \item \textbf{Integration Testing:} After unit testing, we will test the interaction between different components of the code.
+    \item \textbf{Functional Testing:} We will test the functionality of the software as a whole to ensure it meets the requirements.
+    \item \textbf{Performance Testing:} We will test the performance of the software under various conditions to ensure it meets the performance criteria.
+    \item \textbf{Comparison with Benchmark:} We will compare our results with those obtained from Dynare to validate our implementation.
+\end{enumerate}
+
+Each test will be documented with its purpose, expected results, and actual results. Any discrepancies will be logged and addressed before proceeding to the next phase of testing.
+
+\section{Future Plan}
+
+Up to now, I have finished the first part of the replication design, and the symbolic model is built using Sympy. The next step is to simulate the model and evaluate the likelihood. I will keep updating the project's progress on Github, and the final report will be submitted on time.
+
+Here is the snapshot for the "\_\_init\_\_.py" file of the generated RBC model:
 
 \bibliography{ref}
-
+\bibliographystyle{jf}
 \end{document}

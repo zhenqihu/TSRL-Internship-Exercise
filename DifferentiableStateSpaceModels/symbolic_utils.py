@@ -3,7 +3,7 @@
 # @File    : symbolic_utils.py
 # @Author  : Zhenqi Hu
 # @Date    : 28/11/2023 3:15 pm
-from sympy import symbols, simplify, diff, Function, Matrix, MatrixBase
+from sympy import symbols, simplify, diff, Function, Matrix, MatrixBase, lambdify
 from collections.abc import Iterable
 import inspect
 
@@ -91,3 +91,25 @@ def differentiate_to_dict(f, p):
     if f is None or p is None:
         return None
     return {str(p_val): nested_differentiate(f, p_val) for p_val in p}
+
+
+def build_named_function(expr, name, *args):
+    """
+    Builds a named function
+    :param expr: sympy expression
+    :param name: function name (string)
+    :param args: arguments of the function
+    :return: source code of the function
+    """
+    if expr is None:
+        return None
+    if isinstance(expr, dict):
+        return {key: build_named_function(value, name + "_" + key, *args)
+                for key, value in expr.items()}
+    else:
+        # create the function from the expression
+        f = lambdify(args, expr, modules="numpy")
+        # rename the function
+        source_code = inspect.getsource(f)
+        source_code = source_code.replace("_lambdifygenerated", name)
+    return source_code
