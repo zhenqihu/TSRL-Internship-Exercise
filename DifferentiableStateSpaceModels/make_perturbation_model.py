@@ -4,6 +4,7 @@
 # @Author  : Zhenqi Hu
 # @Date    : 29/11/2023 12:18 am
 import os
+import sys
 from pathlib import Path
 import DifferentiableStateSpaceModels
 from DifferentiableStateSpaceModels import *
@@ -233,10 +234,12 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     Ψ_expr = build_named_function(Ψ, "Ψ", y, x, p)
     Ψ_yp_expr = None if max_order < 2 else build_named_function(
         Ψ_yp, "Ψ_yp", y, x, p)
-    Ψ_y_expr = None if max_order < 2 else build_named_function(Ψ_y, "Ψ_y", y, x, p)
+    Ψ_y_expr = None if max_order < 2 else build_named_function(
+        Ψ_y, "Ψ_y", y, x, p)
     Ψ_xp_expr = None if max_order < 2 else build_named_function(
         Ψ_xp, "Ψ_xp", y, x, p)
-    Ψ_x_expr = None if max_order < 2 else build_named_function(Ψ_x, "Ψ_x", y, x, p)
+    Ψ_x_expr = None if max_order < 2 else build_named_function(
+        Ψ_x, "Ψ_x", y, x, p)
     H_bar_expr = build_named_function(H_bar, "H_bar", [y, x], p)
     H_bar_w_expr = build_named_function(H_bar_w, "H_bar_w", [y, x], p)
     y_bar_iv_expr = build_named_function(y_bar_iv, "y_bar_iv", p)
@@ -257,7 +260,8 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     H_p_expr = build_named_function(H_p, "H_p", y, x, p)
     y_bar_p_expr = build_named_function(y_bar_p, "y_bar_p", p)
     x_bar_p_expr = build_named_function(x_bar_p, "x_bar_p", p)
-    Ψ_p_expr = None if max_order < 2 else build_named_function(Ψ_p, "Ψ_p", y, x, p)
+    Ψ_p_expr = None if max_order < 2 else build_named_function(
+        Ψ_p, "Ψ_p", y, x, p)
 
     # Done with building the model functions
     if print_level > 2:
@@ -268,17 +272,21 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     os.makedirs(model_cache_location, exist_ok=True)
     os.makedirs(os.path.join(model_cache_location, model_name), exist_ok=True)
     # module_cache_path has the core module stuff and includes the others
-    zero_order_path = os.path.join(model_cache_location, model_name, "zero_order.py")
-    first_order_path = os.path.join(model_cache_location, model_name, "first_order.py")
-    second_order_path = os.path.join(model_cache_location, model_name, "second_order.py")
+    zero_order_path = os.path.join(
+        model_cache_location, model_name, "zero_order.py")
+    first_order_path = os.path.join(
+        model_cache_location, model_name, "first_order.py")
+    second_order_path = os.path.join(
+        model_cache_location, model_name, "second_order.py")
 
     # Basic definitions are independent of the order
     with open(module_cache_path, "w", encoding="utf-8") as io:
         io.write(f"import sys\n")
         io.write(f"import os\n")
-        io.write(f"import numpy as np\n")
+        io.write(f"import numpy as np\n\n")
         # io.write(f"sys.path.append('{model_cache_location}')\n")
-        io.write(f"sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))\n\n")
+        io.write(
+            f"sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))\n\n")
         io.write(f"# Model definitions\n")
         io.write(f"max_order = {max_order}\n")
         io.write(f"n_y = {n_y}\n")
@@ -295,12 +303,14 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
         io.write(f"# Display definitions\n")
         io.write(f"x_symbols = {[elem['symbol'] for elem in x_subs]}\n")
         io.write(f"y_symbols = {[elem['symbol'] for elem in y_subs]}\n")
-        io.write(f"u_symbols = {[elem['symbol'] for elem in y_subs + x_subs]}\n")
+        io.write(
+            f"u_symbols = {[elem['symbol'] for elem in y_subs + x_subs]}\n")
         io.write(f"p_symbols = {list(map(str, p))}\n")
         io.write(f"H_latex = r\"{H_latex}\"\n")
         io.write(f"steady_states_latex = r\"{steady_states_latex}\"\n")
         if steady_states_iv is not None:
-            io.write(f"steady_states_iv_latex = r\"{steady_states_iv_latex}\"\n")
+            io.write(
+                f"steady_states_iv_latex = r\"{steady_states_iv_latex}\"\n")
         else:
             io.write(f"steady_states_iv_latex = None\n")
         io.write(f"# Function definitions\n")
@@ -375,3 +385,24 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
             io.write(Ψ_x_expr + "\n\n")
             for fun in Ψ_p_expr.values():
                 io.write(fun + "\n\n")
+
+
+def make_and_include_perturbation_model(model_name, H, **nt):
+    """
+    Utility for making model if required and loading it if it already exists
+    :param model_name: model name
+    :param H: system of equations (list of sympy expressions)
+    :param nt: dictionary of parameters
+    :return:
+    """
+    model_cache_path = os.path.join(DifferentiableStateSpaceModels.default_model_cache_location(),
+                                    model_name, "__init__.py")
+
+    if not os.path.exists(model_cache_path):
+        make_perturbation_model(H, model_name=model_name, **nt)
+        exec(open(model_cache_path, encoding='utf8').read())
+    elif model_name not in globals():
+        exec(open(model_cache_path, encoding='utf8').read())
+
+    mod = sys.modules[model_name]
+    return DifferentiableStateSpaceModels.PerturbationModel(mod)

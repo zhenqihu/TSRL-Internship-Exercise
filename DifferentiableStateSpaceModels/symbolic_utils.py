@@ -3,6 +3,7 @@
 # @File    : symbolic_utils.py
 # @Author  : Zhenqi Hu
 # @Date    : 28/11/2023 3:15 pm
+
 from sympy import symbols, simplify, diff, Function, Matrix, MatrixBase, lambdify
 from collections.abc import Iterable
 import inspect
