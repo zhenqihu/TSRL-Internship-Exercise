@@ -32,9 +32,9 @@ def order_vector_by_symbols(x, symbol_list):
     Orders a vector according to a list of symbols
     :param x: dictionary of symbols
     :param symbol_list: list of symbols
-    :return: a new Matrix ordered according to the list of symbols
+    :return: a new list with the elements of x ordered according to symbol_list
     """
-    return Matrix([x[sym] for sym in symbol_list])
+    return [x[sym] for sym in symbol_list]
 
 
 def substitute_and_simplify(f, subs, do_simplify=False):

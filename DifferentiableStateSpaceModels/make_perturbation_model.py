@@ -113,14 +113,14 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
             do_simplify, simplify_p, simplify_Ψ))
 
     # create functions in correct order (steady states & steady states initial values)
-    y_bar = None if steady_states is None else order_vector_by_symbols(
-        equations_to_dict(steady_states), [y_sub['symbol'] for y_sub in y_subs])
-    x_bar = None if steady_states is None else order_vector_by_symbols(
-        equations_to_dict(steady_states), [x_sub['symbol'] for x_sub in x_subs])
-    y_bar_iv = None if steady_states_iv is None else order_vector_by_symbols(
-        equations_to_dict(steady_states_iv), [y_sub['symbol'] for y_sub in y_subs])
-    x_bar_iv = None if steady_states_iv is None else order_vector_by_symbols(
-        equations_to_dict(steady_states_iv), [x_sub['symbol'] for x_sub in x_subs])
+    y_bar = None if steady_states is None else Matrix(order_vector_by_symbols(
+        equations_to_dict(steady_states), [y_sub['symbol'] for y_sub in y_subs]))
+    x_bar = None if steady_states is None else Matrix(order_vector_by_symbols(
+        equations_to_dict(steady_states), [x_sub['symbol'] for x_sub in x_subs]))
+    y_bar_iv = None if steady_states_iv is None else Matrix(order_vector_by_symbols(
+        equations_to_dict(steady_states_iv), [y_sub['symbol'] for y_sub in y_subs]))
+    x_bar_iv = None if steady_states_iv is None else Matrix(order_vector_by_symbols(
+        equations_to_dict(steady_states_iv), [x_sub['symbol'] for x_sub in x_subs]))
 
     # Get any latex generated stuff we wish for pretty display of the model
     H_latex = latex(H)
@@ -329,8 +329,8 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
         io.write(H_bar_expr + "\n\n")
         io.write(H_bar_w_expr + "\n\n")
         if steady_states_iv is None:
-            io.write("y_bar = None\n\n")
-            io.write("x_bar = None\n\n")
+            io.write("y_bar_iv = None\n\n")
+            io.write("x_bar_iv = None\n\n")
         else:
             io.write(y_bar_iv_expr + "\n\n")
             io.write(x_bar_iv_expr + "\n\n")

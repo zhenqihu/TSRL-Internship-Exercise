@@ -30,7 +30,7 @@ def test_order_vector_by_symbols():
 
     # Concatenate subs_x and subs_y
     subs = pd.concat([subs_x, subs_y]).reset_index(drop=True)
-    print(subs)
+    # print(subs)
 
     # Convert p to symbols
     p_symbols = [str(var) for var in p]
