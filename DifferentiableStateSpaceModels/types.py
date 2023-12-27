@@ -7,6 +7,7 @@ import numpy as np
 from abc import ABC
 from collections.abc import Iterable
 
+
 # A wrapper for Module.
 # The only purpose is a specialization of deepcopy since otherwise the "mod" property in the PerturbationModule brakes multithreaded MCMC
 class ModuleWrapper:
@@ -244,9 +245,10 @@ class AbstractSecondOrderPerturbationSolution(AbstractPerturbationSolution):
     pass
 
 
+# TODO: figure out how to make this work with the cache
 def make_covariance_matrix(x):
     if isinstance(x, Iterable):
-        return [np.square(np.abs(x_i)) for x_i in x]
+        return np.square(np.abs(x))
     else:
         return x
 
@@ -284,3 +286,46 @@ class FirstOrderPerturbationSolution(AbstractFirstOrderPerturbationSolution):
         else:
             self.x_ergodic_var = np.diag(settings.singular_covariance_value * np.ones(m.n_x))
         self.Γ = c.Γ
+
+
+class SecondOrderPerturbationSolution(AbstractSecondOrderPerturbationSolution):
+    def __init__(self, retcode, m, c, settings):
+        """
+        :param retcode:
+        :param m: PerturbationModel
+        :param c: SolverCache
+        :param settings: PerturbationSolverSettings
+        """
+        self.retcode = retcode
+        self.x_symbols = m.mod.m.x_symbols
+        self.y_symbols = m.mod.m.y_symbols
+        self.p_symbols = m.mod.m.p_symbols
+        self.p_d_symbols = c.p_d_symbols
+        self.u_symbols = m.mod.m.u_symbols
+        self.n_y = m.n_y
+        self.n_x = m.n_x
+        self.n_p = m.n_p
+        self.n_ϵ = m.n_ϵ
+        self.n_z = m.n_z
+        self.y = c.y
+        self.x = c.x
+        self.g_x = c.g_x
+        self.B = c.B
+        self.D = make_covariance_matrix(c.Ω)
+        self.Q = c.Q
+        self.η = c.η
+        if settings.calculate_ergodic_distribution and retcode == "Success":
+            self.x_ergodic_var = c.V
+        else:
+            self.x_ergodic_var = np.diag(settings.singular_covariance_value * np.ones(m.n_x))
+        self.Γ = c.Γ
+
+        self.g_xx = c.g_xx
+        self.g_σσ = c.g_σσ
+        self.A_0 = 0.5 * c.h_σσ
+        self.A_1 = c.h_x
+        self.A_2 = 0.5 * c.h_xx
+
+        self.C_0 = c.C_0
+        self.C_1 = c.C_1
+        self.C_2 = c.C_2
