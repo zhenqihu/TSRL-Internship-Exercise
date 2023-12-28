@@ -9,6 +9,8 @@ from DifferentiableStateSpaceModels.utils import fill_zeros, maybe_call_function
 from DifferentiableStateSpaceModels.symbolic_utils import order_vector_by_symbols
 from DifferentiableStateSpaceModels.types import *
 from scipy.optimize import fsolve
+from scipy.linalg import schur, lu, qz, ordqz
+from scipy.linalg import solve_continuous_lyapunov as lyapd
 
 
 def create_or_zero_cache(m, cache, order, p_d, zero_cache):
@@ -184,6 +186,42 @@ def evaluate_second_order_functions(m, c, settings, p):
 
 
 def solve_first_order(m, c, settings):
+    ϵ_BK, print_level = settings.ϵ_BK, settings.print_level
+    n_x, n_y, n_p, n_ϵ = m.n_x, m.n_y, m.n_p, m.n_ϵ
+    n = n_x + n_y
+
+    if settings.print_level > 2:
+        print("Solving first order perturbation")
+    try:
+        buff = c.first_order_solver_buffer
+        buff.A = np.concatenate((c.H_yp, c.H_xp), axis=1)
+        buff.B = np.concatenate((c.H_y, c.H_x), axis=1)
+        if settings.print_level > 3:
+            print("Calculating schur")
+        S, T, Q, Z = qz(buff.A, buff.B, output='complex')  # Generalized Schur decomposition
+        buff.A = S  # overwrite A with S
+        buff.B = T  # overwrite B with T
+        α = np.diag(S)  # diagonal of S
+        β = np.diag(T)  # diagonal of T
+        # The generalized eigenvalues λ_i are S_ii / T_ii
+        # Following Blanchard-Kahn condition, we reorder the Schur so that
+        # S_22 ./ T_22 < 1, ie, the eigenvalues < 1 come last
+        # inds = [s.α[i] / s.β[i] >= 1 for i in 1:n]
+        inds = np.abs(α) >= (1 - ϵ_BK) * np.abs(β)
+        if np.sum(inds) != n_x:
+            if print_level > 0:
+                print("Blanchard-Kahn condition not satisfied\n")
+            if settings.rethrow_exceptions:
+                raise Exception("Failure of the Blanchard Khan Condition")
+            else:
+                return 'Blanchard_Kahn_Failure'
+    except Exception as e:
+        if settings.rethrow_exceptions:
+            raise e
+        else:
+            if settings.print_level > 0:
+                print(e)
+            return 'FAILURE'
     return "Success"
 
 
