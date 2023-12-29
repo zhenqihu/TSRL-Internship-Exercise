@@ -7,10 +7,9 @@
 import pytest
 import os
 import sys
-from DifferentiableStateSpaceModels import make_perturbation_model, default_model_cache_location, PerturbationModel, SolverCache
+from DifferentiableStateSpaceModels import (make_perturbation_model, default_model_cache_location,
+                                            PerturbationModel, SolverCache, make_and_include_perturbation_model)
 from sympy import symbols, Function, exp, Eq, oo, Matrix
-
-sys.path.append(default_model_cache_location())
 
 
 def test_basic_construction_of_model():
@@ -57,19 +56,20 @@ def test_basic_construction_of_model():
     max_order = 2
 
     make_perturbation_model(H, model_name=model_name, t=t, y=y, x=x, p=p,
-                                                steady_states=steady_states, steady_states_iv=steady_states_iv,
-                                                Γ=Γ, Ω=Ω, η=η, Q=Q, overwrite_model_cache=True,
-                                                print_level=print_level, max_order=max_order)
+                            steady_states=steady_states, steady_states_iv=steady_states_iv,
+                            Γ=Γ, Ω=Ω, η=η, Q=Q, overwrite_model_cache=True,
+                            print_level=print_level, max_order=max_order)
 
     make_perturbation_model(H, t, y, x, steady_states, steady_states_iv, Γ,
                             Ω, η, Q, p, overwrite_model_cache=True, model_name=model_name)
 
     module_cache_path = make_perturbation_model(H, t, y, x, steady_states, steady_states_iv, Γ,
-                                                Ω, η, Q, p,
-                                                overwrite_model_cache=False, print_level=print_level,
+                                                Ω, η, Q, p, overwrite_model_cache=False, print_level=print_level,
                                                 max_order=max_order, model_name=model_name)
+    assert module_cache_path == os.path.join(default_model_cache_location(), model_name)
 
     # Load the model from the cache
+    sys.path.append(default_model_cache_location())
     exec(f"import {model_name}", globals())
 
     # Test the construction
@@ -78,6 +78,7 @@ def test_basic_construction_of_model():
     assert m.max_order == max_order
     assert m.mod.m.n_z == n_z
 
+    # Test the SolverCache construction
     c1 = SolverCache.from_model(m, 2, ["α", "β"])
     c2 = SolverCache.from_model(m, 1, ["α", "β"])
     c3 = SolverCache.from_model(m, 2, ["α"])
@@ -85,3 +86,22 @@ def test_basic_construction_of_model():
     assert isinstance(c2, SolverCache)
     assert isinstance(c3, SolverCache)
 
+    # Use dict of arguments, without specifying model_name
+    args = {'t': t, 'y': y, 'x': x, 'p': p, 'steady_states': steady_states,
+            'steady_states_iv': steady_states_iv, 'Γ': Γ, 'Ω': Ω, 'η': η, 'Q': Q,
+            'overwrite_model_cache': True, 'print_level': print_level, 'max_order': max_order}
+
+    m = make_and_include_perturbation_model(H, model_name='rbc_conv2', **args)
+    m = PerturbationModel(sys.modules['rbc_conv2'])
+    m = make_and_include_perturbation_model(H, model_name='rbc_conv2', **args)
+    m = make_and_include_perturbation_model(H, model_name='rbc_temp', **args)
+
+
+def test_loading_examples():
+    # TODO: Add tests for loading examples
+    return
+
+
+def test_deep_copying():
+    # TODO: Add tests for deep copying
+    return

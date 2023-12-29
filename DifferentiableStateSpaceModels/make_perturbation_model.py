@@ -385,7 +385,7 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
                 io.write(fun + "\n\n")
 
 
-def make_and_include_perturbation_model(model_name, H, **nt):
+def make_and_include_perturbation_model(H, model_name, **nt):
     """
     Utility for making model if required and loading it if it already exists
     :param model_name: model name
