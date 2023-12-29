@@ -168,15 +168,15 @@ class SolverCache(AbstractSolverCache):
         self.h_σσ = None if Order < 2 else np.zeros(N_x)
         self.g_xx_p = None if Order < 2 else [np.zeros((N_y, N_x, N_x)) for _ in range(N_p_d)]
         self.h_xx_p = None if Order < 2 else [np.zeros((N_x, N_x, N_x)) for _ in range(N_p_d)]
-        self.g_σσ_p = None if Order < 2 else np.zeros(N_y, N_p_d)
-        self.h_σσ_p = None if Order < 2 else np.zeros(N_x, N_p_d)
+        self.g_σσ_p = None if Order < 2 else np.zeros((N_y, N_p_d))
+        self.h_σσ_p = None if Order < 2 else np.zeros((N_x, N_p_d))
 
         # Additional for solution type 2nd order
-        self.A_0_p = None if Order < 2 else np.zeros(N_x, N_p_d)
+        self.A_0_p = None if Order < 2 else np.zeros((N_x, N_p_d))
         self.A_2_p = None if Order < 2 else [np.zeros((N_x, N_x, N_x)) for _ in range(N_p_d)]
         self.C_0 = None if Order < 2 else np.zeros(N_z)
         self.C_2 = None if Order < 2 else np.zeros((N_z, N_x, N_x))
-        self.C_0_p = None if Order < 2 else np.zeros(N_z, N_p_d)
+        self.C_0_p = None if Order < 2 else np.zeros((N_z, N_p_d))
         self.C_2_p = None if Order < 2 else [np.zeros((N_z, N_x, N_x)) for _ in range(N_p_d)]
 
         # Buffers for additional calculations

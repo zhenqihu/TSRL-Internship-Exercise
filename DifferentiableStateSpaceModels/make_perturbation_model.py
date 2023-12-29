@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 import DifferentiableStateSpaceModels
 from DifferentiableStateSpaceModels import *
-from sympy import Matrix, latex, hessian, simplify, lambdify
+from sympy import Matrix, latex, hessian, simplify
 from copy import deepcopy
 
 
@@ -57,10 +57,10 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
 
     # path to save the model modules
     module_cache_path = os.path.join(
-        model_cache_location, model_name, "__init__.py")
+        model_cache_location, model_name)  # e.g. ./.function_cache/rbc
 
     # only load cache if the module isn't already loaded in memory
-    if (str(model_name) in globals()) and (not overwrite_model_cache):
+    if (model_name in sys.modules) and (not overwrite_model_cache):
         if print_level > 0:
             print(f"Using existing module {model_name}\n")
         return module_cache_path
@@ -270,17 +270,15 @@ def make_perturbation_model(H, t, y, x, steady_states=None,
     # ------------------------------ Beginning Save the model & functions --------------------------------------------#
     # Separate filenames for different orders and function types.  For example
     os.makedirs(model_cache_location, exist_ok=True)
-    os.makedirs(os.path.join(model_cache_location, model_name), exist_ok=True)
-    # module_cache_path has the core module stuff and includes the others
-    zero_order_path = os.path.join(
-        model_cache_location, model_name, "zero_order.py")
-    first_order_path = os.path.join(
-        model_cache_location, model_name, "first_order.py")
-    second_order_path = os.path.join(
-        model_cache_location, model_name, "second_order.py")
+    os.makedirs(module_cache_path, exist_ok=True)
+    # init_path has the core module stuff and includes the others
+    init_path = os.path.join(module_cache_path, "__init__.py")
+    zero_order_path = os.path.join(module_cache_path, "zero_order.py")
+    first_order_path = os.path.join(module_cache_path, "first_order.py")
+    second_order_path = os.path.join(module_cache_path, "second_order.py")
 
     # Basic definitions are independent of the order
-    with open(module_cache_path, "w", encoding="utf-8") as io:
+    with open(init_path, "w", encoding="utf-8") as io:
         io.write(f"import sys\n")
         io.write(f"import os\n")
         io.write(f"import numpy as np\n\n")
@@ -395,14 +393,17 @@ def make_and_include_perturbation_model(model_name, H, **nt):
     :param nt: dictionary of parameters
     :return:
     """
-    model_cache_path = os.path.join(DifferentiableStateSpaceModels.default_model_cache_location(),
-                                    model_name, "__init__.py")
+    model_cache_path = os.path.join(default_model_cache_location(), model_name)
+    # init_path = os.path.join(model_cache_path, "__init__.py")
+    sys.path.append(default_model_cache_location())
 
     if not os.path.exists(model_cache_path):
         make_perturbation_model(H, model_name=model_name, **nt)
-        exec(open(model_cache_path, encoding='utf8').read())
-    elif model_name not in globals():
-        exec(open(model_cache_path, encoding='utf8').read())
+        # Load the model from the cache
+        exec(f"import {model_name}", globals())
+    elif model_name not in sys.modules:
+        exec(f"import {model_name}", globals())
+        # exec(open(init_path, encoding='utf8').read())
 
-    mod = sys.modules[model_name]
+    mod = sys.modules[model_name]  # Get the module
     return DifferentiableStateSpaceModels.PerturbationModel(mod)
